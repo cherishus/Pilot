@@ -10,6 +10,7 @@
 
 #include "editor/include/editor_file_service.h"
 
+#include <chrono>
 #include <map>
 #include <vector>
 
@@ -37,19 +38,20 @@ namespace Pilot
                                float     last_mouse_pos_y,
                                Matrix4x4 object_matrix);
         void        updateCursorOnAxis(Vector2 cursor_uv);
-        void        buildEditorFileAssstsUITree(EditorFileNode* node);
+        void        buildEditorFileAssetsUITree(EditorFileNode* node);
         void        processEditorCommand();
         void        drawAxisToggleButton(const char* string_id, bool check_state, EditorAxisMode axis_mode);
         void        createComponentUI(Reflection::ReflectionInstance& instance);
         void        createLeafNodeUI(Reflection::ReflectionInstance& instance);
         std::string getLeafUINodeParentLabel();
+        bool        isCursorInRect(Vector2 pos, Vector2 size) const;
 
         void showEditorUI();
         void showEditorMenu(bool* p_open);
         void showEditorWorldObjectsWindow(bool* p_open);
         void showEditorFileContentWindow(bool* p_open);
         void showEditorGameWindow(bool* p_open);
-        void showEditorDetialWindow(bool* p_open);
+        void showEditorDetailWindow(bool* p_open);
 
         void onReset();
         void onCursorPos(double xpos, double ypos);
@@ -58,9 +60,10 @@ namespace Pilot
         void onMouseButtonClicked(int key, int action);
         void onWindowClosed();
 
-        GObject* getSelectedGObject() const;
-        void     onGObjectSelected(size_t selected_gobject_id);
-        void     onDeleteSelectedGObject();
+        std::weak_ptr<GObject> getSelectedGObject() const;
+
+        void onGObjectSelected(GObjectID selected_gobject_id);
+        void onDeleteSelectedGObject();
 
     public:
         EditorUI(PilotEditor* editor);
@@ -78,6 +81,7 @@ namespace Pilot
         Vector2 m_engine_window_size {1280.0f, 768.0f};
         float   m_mouse_x {0.0f};
         float   m_mouse_y {0.0f};
+        float   m_camera_speed {0.05f};
 
         bool m_is_editor_mode {true};
         int  m_key_state {0};
@@ -93,5 +97,8 @@ namespace Pilot
         EditorTranslationAxis m_translation_axis;
         EditorRotationAxis    m_rotation_axis;
         EditorScaleAxis       m_scale_aixs;
+
+        EditorFileService                                  m_editor_file_service;
+        std::chrono::time_point<std::chrono::steady_clock> m_last_file_tree_update;
     };
 } // namespace Pilot

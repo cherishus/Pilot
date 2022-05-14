@@ -1,6 +1,6 @@
 #include "editor/include/editor_ui.h"
 
-#include "editor//include/editor.h"
+#include "editor/include/editor.h"
 
 #include "runtime/core/base/macro.h"
 #include "runtime/core/meta/reflection/reflection.h"
@@ -29,6 +29,14 @@ namespace Pilot
 {
     std::vector<std::pair<std::string, bool>> g_editor_node_state_array;
     int                                       g_node_depth = -1;
+    void                                      DrawVecControl(const std::string& label,
+                                                             Pilot::Vector3&    values,
+                                                             float              resetValue  = 0.0f,
+                                                             float              columnWidth = 100.0f);
+    void                                      DrawVecControl(const std::string& label,
+                                                             Pilot::Quaternion& values,
+                                                             float              resetValue  = 0.0f,
+                                                             float              columnWidth = 100.0f);
 
     EditorUI::EditorUI(PilotEditor* editor) : m_editor(editor)
     {
@@ -69,27 +77,42 @@ namespace Pilot
             {
                 Transform* trans_ptr = static_cast<Transform*>(value_ptr);
 
-                float position_val[3] = {trans_ptr->m_position.x, trans_ptr->m_position.y, trans_ptr->m_position.z};
-                float rotation_val[4] = {
-                    trans_ptr->m_rotation.x, trans_ptr->m_rotation.y, trans_ptr->m_rotation.z, trans_ptr->m_rotation.w};
-                float scale_val[3] = {trans_ptr->m_scale.x, trans_ptr->m_scale.y, trans_ptr->m_scale.z};
+                Vector3 degrees_val;
 
-                ImGui::TableNextColumn();
-                ImGui::Text("Position");
-                ImGui::TableNextColumn();
-                ImGui::DragFloat3("##Position", position_val);
-                ImGui::TableNextColumn();
-                ImGui::Text("Rotation");
-                ImGui::TableNextColumn();
-                ImGui::DragFloat4("##Rotation", rotation_val);
-                ImGui::TableNextColumn();
-                ImGui::Text("Scale");
-                ImGui::TableNextColumn();
-                ImGui::DragFloat3("##Scale", scale_val);
+                degrees_val.x = trans_ptr->m_rotation.getRoll(false).valueDegrees();
+                degrees_val.y = trans_ptr->m_rotation.getPitch(false).valueDegrees();
+                degrees_val.z = trans_ptr->m_rotation.getYaw(false).valueDegrees();
 
-                trans_ptr->m_position = Vector3(position_val[0], position_val[1], position_val[2]);
-                trans_ptr->m_rotation = Quaternion(rotation_val[3], rotation_val[0], rotation_val[1], rotation_val[2]);
-                trans_ptr->m_scale    = Vector3(scale_val[0], scale_val[1], scale_val[2]);
+                DrawVecControl("Position", trans_ptr->m_position);
+                DrawVecControl("Rotation", degrees_val);
+                DrawVecControl("Scale", trans_ptr->m_scale);
+
+                trans_ptr->m_rotation.w = Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
+                                              Math::cos(Math::degreesToRadians(degrees_val.z / 2)) *
+                                              Math::cos(Math::degreesToRadians(degrees_val.x / 2)) +
+                                          Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
+                                              Math::sin(Math::degreesToRadians(degrees_val.z / 2)) *
+                                              Math::sin(Math::degreesToRadians(degrees_val.x / 2));
+                trans_ptr->m_rotation.x = Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
+                                              Math::cos(Math::degreesToRadians(degrees_val.z / 2)) *
+                                              Math::cos(Math::degreesToRadians(degrees_val.x / 2)) -
+                                          Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
+                                              Math::sin(Math::degreesToRadians(degrees_val.z / 2)) *
+                                              Math::sin(Math::degreesToRadians(degrees_val.x / 2));
+                trans_ptr->m_rotation.y = Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
+                                              Math::sin(Math::degreesToRadians(degrees_val.z / 2)) *
+                                              Math::cos(Math::degreesToRadians(degrees_val.x / 2)) +
+                                          Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
+                                              Math::cos(Math::degreesToRadians(degrees_val.z / 2)) *
+                                              Math::sin(Math::degreesToRadians(degrees_val.x / 2));
+                trans_ptr->m_rotation.z = Math::cos(Math::degreesToRadians(degrees_val.y / 2)) *
+                                              Math::cos(Math::degreesToRadians(degrees_val.z / 2)) *
+                                              Math::sin(Math::degreesToRadians(degrees_val.x / 2)) -
+                                          Math::sin(Math::degreesToRadians(degrees_val.y / 2)) *
+                                              Math::sin(Math::degreesToRadians(degrees_val.z / 2)) *
+                                              Math::cos(Math::degreesToRadians(degrees_val.x / 2));
+                trans_ptr->m_rotation.normalise();
+
                 drawSelectedEntityAxis();
             }
         };
@@ -97,7 +120,7 @@ namespace Pilot
             if (g_node_depth == -1)
             {
                 std::string label = "##" + name;
-                ImGui::Text(name.c_str());
+                ImGui::Text("%s", name.c_str());
                 ImGui::SameLine();
                 ImGui::InputInt(label.c_str(), static_cast<int*>(value_ptr));
             }
@@ -106,7 +129,7 @@ namespace Pilot
                 if (g_editor_node_state_array[g_node_depth].second)
                 {
                     std::string full_label = "##" + getLeafUINodeParentLabel() + name;
-                    ImGui::Text((name + ":").c_str());
+                    ImGui::Text("%s", (name + ":").c_str());
                     ImGui::InputInt(full_label.c_str(), static_cast<int*>(value_ptr));
                 }
             }
@@ -115,7 +138,7 @@ namespace Pilot
             if (g_node_depth == -1)
             {
                 std::string label = "##" + name;
-                ImGui::Text(name.c_str());
+                ImGui::Text("%s", name.c_str());
                 ImGui::SameLine();
                 ImGui::InputFloat(label.c_str(), static_cast<float*>(value_ptr));
             }
@@ -124,7 +147,7 @@ namespace Pilot
                 if (g_editor_node_state_array[g_node_depth].second)
                 {
                     std::string full_label = "##" + getLeafUINodeParentLabel() + name;
-                    ImGui::Text((name + ":").c_str());
+                    ImGui::Text("%s", (name + ":").c_str());
                     ImGui::InputFloat(full_label.c_str(), static_cast<float*>(value_ptr));
                 }
             }
@@ -135,7 +158,7 @@ namespace Pilot
             if (g_node_depth == -1)
             {
                 std::string label = "##" + name;
-                ImGui::Text(name.c_str());
+                ImGui::Text("%s", name.c_str());
                 ImGui::SameLine();
                 ImGui::DragFloat3(label.c_str(), val);
             }
@@ -144,7 +167,7 @@ namespace Pilot
                 if (g_editor_node_state_array[g_node_depth].second)
                 {
                     std::string full_label = "##" + getLeafUINodeParentLabel() + name;
-                    ImGui::Text((name + ":").c_str());
+                    ImGui::Text("%s", (name + ":").c_str());
                     ImGui::DragFloat3(full_label.c_str(), val);
                 }
             }
@@ -158,7 +181,7 @@ namespace Pilot
             if (g_node_depth == -1)
             {
                 std::string label = "##" + name;
-                ImGui::Text(name.c_str());
+                ImGui::Text("%s", name.c_str());
                 ImGui::SameLine();
                 ImGui::DragFloat4(label.c_str(), val);
             }
@@ -167,7 +190,7 @@ namespace Pilot
                 if (g_editor_node_state_array[g_node_depth].second)
                 {
                     std::string full_label = "##" + getLeafUINodeParentLabel() + name;
-                    ImGui::Text((name + ":").c_str());
+                    ImGui::Text("%s", (name + ":").c_str());
                     ImGui::DragFloat4(full_label.c_str(), val);
                 }
             }
@@ -181,16 +204,16 @@ namespace Pilot
             if (g_node_depth == -1)
             {
                 std::string label = "##" + name;
-                ImGui::Text(name.c_str());
+                ImGui::Text("%s", name.c_str());
                 ImGui::SameLine();
-                ImGui::Text((*static_cast<std::string*>(value_ptr)).c_str());
+                ImGui::Text("%s", (*static_cast<std::string*>(value_ptr)).c_str());
             }
             else
             {
                 if (g_editor_node_state_array[g_node_depth].second)
                 {
                     std::string full_label = "##" + getLeafUINodeParentLabel() + name;
-                    ImGui::Text((name + ":").c_str());
+                    ImGui::Text("%s", (name + ":").c_str());
                     std::string value_str = *static_cast<std::string*>(value_ptr);
                     if (value_str.find_first_of('/') != std::string::npos)
                     {
@@ -205,7 +228,7 @@ namespace Pilot
                             value_str.clear();
                         }
                     }
-                    ImGui::Text(value_str.c_str());
+                    ImGui::Text("%s", value_str.c_str());
                 }
             }
         };
@@ -222,29 +245,36 @@ namespace Pilot
         return parent_label;
     }
 
-    GObject* EditorUI::getSelectedGObject() const
+    bool EditorUI::isCursorInRect(Vector2 pos, Vector2 size) const
     {
-        GObject* selected_object = nullptr;
-        if (m_selected_gobject_id != PILOT_INVALID_GOBJECT_ID)
+        return pos.x <= m_mouse_x && m_mouse_x <= pos.x + size.x && pos.y <= m_mouse_y && m_mouse_y <= pos.y + size.y;
+    }
+
+    std::weak_ptr<GObject> EditorUI::getSelectedGObject() const
+    {
+        std::weak_ptr<GObject> selected_object;
+        if (m_selected_gobject_id == k_invalid_gobject_id)
         {
-            Level* level = WorldManager::getInstance().getCurrentActiveLevel();
-            if (level != nullptr)
-            {
-                selected_object = level->getGObjectByID(m_selected_gobject_id);
-            }
+            return selected_object;
+        }
+
+        std::shared_ptr<Level> level = WorldManager::getInstance().getCurrentActiveLevel().lock();
+        if (level != nullptr)
+        {
+            selected_object = level->getGObjectByID(m_selected_gobject_id);
         }
 
         return selected_object;
     }
 
-    void EditorUI::onGObjectSelected(size_t selected_gobject_id)
+    void EditorUI::onGObjectSelected(GObjectID selected_gobject_id)
     {
         if (selected_gobject_id == m_selected_gobject_id)
             return;
 
         m_selected_gobject_id = selected_gobject_id;
 
-        GObject* selected_gobject = getSelectedGObject();
+        std::shared_ptr<GObject> selected_gobject = getSelectedGObject().lock();
         if (selected_gobject)
         {
             const TransformComponent* transform_component = selected_gobject->tryGetComponentConst(TransformComponent);
@@ -253,7 +283,7 @@ namespace Pilot
 
         drawSelectedEntityAxis();
 
-        if (m_selected_gobject_id != PILOT_INVALID_GOBJECT_ID)
+        if (m_selected_gobject_id != k_invalid_gobject_id)
         {
             LOG_INFO("select game object " + std::to_string(m_selected_gobject_id));
         }
@@ -284,7 +314,7 @@ namespace Pilot
         showEditorWorldObjectsWindow(&asset_window_open);
         showEditorGameWindow(&game_engine_window_open);
         showEditorFileContentWindow(&file_content_window_open);
-        showEditorDetialWindow(&detail_window_open);
+        showEditorDetailWindow(&detail_window_open);
     }
 
     void EditorUI::showEditorMenu(bool* p_open)
@@ -340,7 +370,7 @@ namespace Pilot
                 if (ImGui::MenuItem("Reload Current Level"))
                 {
                     WorldManager::getInstance().reloadCurrentLevel();
-                    onGObjectSelected(PILOT_INVALID_GOBJECT_ID);
+                    onGObjectSelected(k_invalid_gobject_id);
                 }
                 if (ImGui::MenuItem("Save Current Level"))
                 {
@@ -370,16 +400,16 @@ namespace Pilot
             return;
         }
 
-        const Level* current_active_level = WorldManager::getInstance().getCurrentActiveLevel();
+        std::shared_ptr<Level> current_active_level = WorldManager::getInstance().getCurrentActiveLevel().lock();
         if (current_active_level == nullptr)
             return;
 
-        const auto& all_gobjects = current_active_level->getAllGObjects();
+        const LevelObjectsMap& all_gobjects = current_active_level->getAllGObjects();
         for (auto& id_object_pair : all_gobjects)
         {
-            const size_t      object_id = id_object_pair.first;
-            GObject*          object    = id_object_pair.second;
-            const std::string name      = object->getName();
+            const GObjectID          object_id = id_object_pair.first;
+            std::shared_ptr<GObject> object    = id_object_pair.second;
+            const std::string        name      = object->getName();
             if (name.size() > 0)
             {
                 if (ImGui::Selectable(name.c_str(), m_selected_gobject_id == object_id))
@@ -390,7 +420,7 @@ namespace Pilot
                     }
                     else
                     {
-                        onGObjectSelected(PILOT_INVALID_GOBJECT_ID);
+                        onGObjectSelected(k_invalid_gobject_id);
                     }
                     break;
                 }
@@ -490,7 +520,7 @@ namespace Pilot
         delete[] fields;
     }
 
-    void EditorUI::showEditorDetialWindow(bool* p_open)
+    void EditorUI::showEditorDetailWindow(bool* p_open)
     {
         ImGuiWindowFlags window_flags = ImGuiWindowFlags_None;
 
@@ -502,7 +532,7 @@ namespace Pilot
             return;
         }
 
-        GObject* selected_object = getSelectedGObject();
+        std::shared_ptr<GObject> selected_object = getSelectedGObject().lock();
         if (selected_object == nullptr)
         {
             ImGui::End();
@@ -553,10 +583,17 @@ namespace Pilot
             ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_NoHide);
             ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed);
             ImGui::TableHeadersRow();
-            Pilot::EditorFileService editor_file_service;
-            editor_file_service.buildEngineFileTree();
-            EditorFileNode* editor_root_node = editor_file_service.getEditorRootNode();
-            buildEditorFileAssstsUITree(editor_root_node);
+
+            auto current_time = std::chrono::steady_clock::now();
+            if (current_time - m_last_file_tree_update > std::chrono::seconds(1))
+            {
+                m_editor_file_service.buildEngineFileTree();
+                m_last_file_tree_update = current_time;
+            }
+            m_last_file_tree_update = current_time;
+
+            EditorFileNode* editor_root_node = m_editor_file_service.getEditorRootNode();
+            buildEditorFileAssetsUITree(editor_root_node);
             ImGui::EndTable();
         }
 
@@ -620,13 +657,14 @@ namespace Pilot
             ImGui::SameLine();
 
             float indent_val = 0.0f;
-            indent_val       = m_engine_window_size.x - 100.0f;
+            indent_val       = m_engine_window_size.x - 100.0f * getIndentScale();
+
             ImGui::Indent(indent_val);
             if (m_is_editor_mode)
             {
                 ImGui::PushID("Editor Mode");
                 ImGui::Button("Editor Mode");
-                if (ImGui::IsItemClicked(0))
+                if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
                 {
                     m_is_editor_mode = !m_is_editor_mode;
                     drawSelectedEntityAxis();
@@ -638,9 +676,10 @@ namespace Pilot
             else
             {
                 ImGui::Button("Game Mode");
-                if (ImGui::IsItemClicked(0))
+                if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
                 {
                     m_is_editor_mode = !m_is_editor_mode;
+                    drawSelectedEntityAxis();
                     g_is_editor_mode = true;
                     SceneManager::getInstance().setMainViewMatrix(m_tmp_uistate->m_editor_camera->getViewMatrix());
                 }
@@ -654,17 +693,35 @@ namespace Pilot
         {
             ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Press Left Alt key to display the mouse cursor!");
         }
+        else
+        {
+            ImGui::TextColored(
+                ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Current editor camera move speed: [%f]", m_camera_speed);
+        }
+
+        auto menu_bar_rect = ImGui::GetCurrentWindow()->MenuBarRect();
 
         Vector2 new_window_pos  = {0.0f, 0.0f};
         Vector2 new_window_size = {0.0f, 0.0f};
         new_window_pos.x        = ImGui::GetWindowPos().x;
-        new_window_pos.y        = ImGui::GetWindowPos().y + 38.0f;
+        new_window_pos.y        = ImGui::GetWindowPos().y + menu_bar_rect.Min.y;
         new_window_size.x       = ImGui::GetWindowSize().x;
-        new_window_size.y       = ImGui::GetWindowSize().y - 38.0f;
+        new_window_size.y       = ImGui::GetWindowSize().y - menu_bar_rect.Min.y;
 
         // if (new_window_pos != m_engine_window_pos || new_window_size != m_engine_window_size)
         {
+#if defined(__MACH__)
+            // The dpi_scale is not reactive to DPI changes or monitor switching, it might be a bug from ImGui.
+            // Return value from ImGui::GetMainViewport()->DpiScal is always the same as first frame.
+            // glfwGetMonitorContentScale and glfwSetWindowContentScaleCallback are more adaptive.
+            float dpi_scale = main_viewport->DpiScale;
+            m_editor->onWindowChanged(new_window_pos.x * dpi_scale,
+                                      new_window_pos.y * dpi_scale,
+                                      new_window_size.x * dpi_scale,
+                                      new_window_size.y * dpi_scale);
+#else
             m_editor->onWindowChanged(new_window_pos.x, new_window_pos.y, new_window_size.x, new_window_size.y);
+#endif
 
             m_engine_window_pos  = new_window_pos;
             m_engine_window_size = new_window_size;
@@ -699,7 +756,7 @@ namespace Pilot
         }
     }
 
-    void EditorUI::buildEditorFileAssstsUITree(EditorFileNode* node)
+    void EditorUI::buildEditorFileAssetsUITree(EditorFileNode* node)
     {
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
@@ -713,7 +770,7 @@ namespace Pilot
             if (open)
             {
                 for (int child_n = 0; child_n < node->m_child_nodes.size(); child_n++)
-                    buildEditorFileAssstsUITree(node->m_child_nodes[child_n].get());
+                    buildEditorFileAssetsUITree(node->m_child_nodes[child_n].get());
                 ImGui::TreePop();
             }
         }
@@ -737,7 +794,7 @@ namespace Pilot
         if (node->m_file_type != "object")
             return;
 
-        Level* level = WorldManager::getInstance().getCurrentActiveLevel();
+        std::shared_ptr<Level> level = WorldManager::getInstance().getCurrentActiveLevel().lock();
         if (level == nullptr)
             return;
 
@@ -750,7 +807,7 @@ namespace Pilot
             AssetManager::getInstance().getFullPath(node->m_file_path).generic_string();
 
         size_t new_gobject_id = level->createObject(new_object_instance_res);
-        if (new_gobject_id != PILOT_INVALID_GOBJECT_ID)
+        if (new_gobject_id != k_invalid_gobject_id)
         {
             onGObjectSelected(new_gobject_id);
         }
@@ -758,7 +815,7 @@ namespace Pilot
 
     void EditorUI::drawSelectedEntityAxis()
     {
-        GObject* selected_object = getSelectedGObject();
+        std::shared_ptr<GObject> selected_object = getSelectedGObject().lock();
 
         if (m_is_editor_mode && selected_object != nullptr)
         {
@@ -828,38 +885,34 @@ namespace Pilot
 
     void EditorUI::processEditorCommand()
     {
-        float      camera_speed  = 0.05f;
+        float      camera_speed  = m_camera_speed;
         Quaternion camera_rotate = m_tmp_uistate->m_editor_camera->rotation().inverse();
         Vector3    camera_relative_pos(0, 0, 0);
 
         unsigned int command = InputSystem::getInstance().getEditorCommand();
         if ((unsigned int)EditorCommand::camera_foward & command)
         {
-            camera_relative_pos = {0, camera_speed, 0};
-            camera_relative_pos = camera_rotate * camera_relative_pos;
+            camera_relative_pos += camera_rotate * Vector3 {0, camera_speed, 0};
         }
         if ((unsigned int)EditorCommand::camera_back & command)
         {
-            camera_relative_pos = {0, -camera_speed, 0};
-            camera_relative_pos = camera_rotate * camera_relative_pos;
+            camera_relative_pos += camera_rotate * Vector3 {0, -camera_speed, 0};
         }
         if ((unsigned int)EditorCommand::camera_left & command)
         {
-            camera_relative_pos = {-camera_speed, 0, 0};
-            camera_relative_pos = camera_rotate * camera_relative_pos;
+            camera_relative_pos += camera_rotate * Vector3 {-camera_speed, 0, 0};
         }
         if ((unsigned int)EditorCommand::camera_right & command)
         {
-            camera_relative_pos = {camera_speed, 0, 0};
-            camera_relative_pos = camera_rotate * camera_relative_pos;
+            camera_relative_pos += camera_rotate * Vector3 {camera_speed, 0, 0};
         }
         if ((unsigned int)EditorCommand::camera_up & command)
         {
-            camera_relative_pos = {0, 0, camera_speed};
+            camera_relative_pos += Vector3 {0, 0, camera_speed};
         }
         if ((unsigned int)EditorCommand::camera_down & command)
         {
-            camera_relative_pos = {0, 0, -camera_speed};
+            camera_relative_pos += Vector3 {0, 0, -camera_speed};
         }
         if ((unsigned int)EditorCommand::delete_object & command)
         {
@@ -872,16 +925,16 @@ namespace Pilot
     void EditorUI::onDeleteSelectedGObject()
     {
         // delete selected entity
-        GObject* selected_object = getSelectedGObject();
+        std::shared_ptr<GObject> selected_object = getSelectedGObject().lock();
         if (selected_object != nullptr)
         {
-            Level* current_active_level = WorldManager::getInstance().getCurrentActiveLevel();
+            std::shared_ptr<Level> current_active_level = WorldManager::getInstance().getCurrentActiveLevel().lock();
             if (current_active_level == nullptr)
                 return;
 
             current_active_level->deleteGObjectByID(m_selected_gobject_id);
         }
-        onGObjectSelected(PILOT_INVALID_GOBJECT_ID);
+        onGObjectSelected(k_invalid_gobject_id);
     }
 
     void EditorUI::onCursorPos(double xpos, double ypos)
@@ -889,12 +942,13 @@ namespace Pilot
         if (!m_is_editor_mode)
             return;
 
-        constexpr float angularVelocity = 180.0f / 600.0f; // degrees/pixel
+        float angularVelocity =
+            180.0f / Math::max(m_engine_window_size.x, m_engine_window_size.y); // 180 degrees while moving full screen
         if (m_mouse_x >= 0.0f && m_mouse_y >= 0.0f)
         {
             if (m_io->isMouseButtonDown(GLFW_MOUSE_BUTTON_RIGHT))
             {
-                glfwSetInputMode(m_io->m_window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+                glfwSetInputMode(m_io->m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
                 m_tmp_uistate->m_editor_camera->rotate(Vector2(ypos - m_mouse_y, xpos - m_mouse_x) * angularVelocity);
             }
             else if (m_io->isMouseButtonDown(GLFW_MOUSE_BUTTON_LEFT))
@@ -906,8 +960,7 @@ namespace Pilot
             {
                 glfwSetInputMode(m_io->m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
-                if (m_mouse_x > m_engine_window_pos.x && m_mouse_x < (m_engine_window_pos.x + m_engine_window_size.x) &&
-                    m_mouse_y > m_engine_window_pos.y && m_mouse_y < (m_engine_window_pos.y + m_engine_window_size.y))
+                if (isCursorInRect(m_engine_window_pos, m_engine_window_size))
                 {
                     Vector2 cursor_uv = Vector2((m_mouse_x - m_engine_window_pos.x) / m_engine_window_size.x,
                                                 (m_mouse_y - m_engine_window_pos.y) / m_engine_window_size.y);
@@ -933,11 +986,25 @@ namespace Pilot
         {
             return;
         }
-        // wheel scrolled up = zoom in by 2 extra degrees
-        if (m_mouse_x > m_engine_window_pos.x && m_mouse_x < (m_engine_window_pos.x + m_engine_window_size.x) &&
-            m_mouse_y > m_engine_window_pos.y && m_mouse_y < (m_engine_window_pos.y + m_engine_window_size.y))
+
+        if (isCursorInRect(m_engine_window_pos, m_engine_window_size))
         {
-            m_tmp_uistate->m_editor_camera->zoom((float)yoffset * 2.0f);
+            if (m_io->isMouseButtonDown(GLFW_MOUSE_BUTTON_RIGHT))
+            {
+                if (yoffset > 0)
+                {
+                    m_camera_speed *= 1.2f;
+                }
+                else
+                {
+                    m_camera_speed *= 0.8f;
+                }
+            }
+            else
+            {
+                m_tmp_uistate->m_editor_camera->zoom((float)yoffset *
+                                                     2.0f); // wheel scrolled up = zoom in by 2 extra degrees
+            }
         }
     }
 
@@ -948,12 +1015,11 @@ namespace Pilot
         if (m_cursor_on_axis != 3)
             return;
 
-        const Level* current_active_level = WorldManager::getInstance().getCurrentActiveLevel();
+        std::shared_ptr<Level> current_active_level = WorldManager::getInstance().getCurrentActiveLevel().lock();
         if (current_active_level == nullptr)
             return;
 
-        if (m_mouse_x > m_engine_window_pos.x && m_mouse_x < (m_engine_window_pos.x + m_engine_window_size.x) &&
-            m_mouse_y > m_engine_window_pos.y && m_mouse_y < (m_engine_window_pos.y + m_engine_window_size.y))
+        if (isCursorInRect(m_engine_window_pos, m_engine_window_size))
         {
             if (key == GLFW_MOUSE_BUTTON_LEFT)
             {
@@ -974,12 +1040,13 @@ namespace Pilot
                               float     last_mouse_pos_y,
                               Matrix4x4 model_matrix)
     {
-        GObject* selected_object = getSelectedGObject();
+        std::shared_ptr<GObject> selected_object = getSelectedGObject().lock();
         if (selected_object == nullptr)
             return;
 
-        constexpr float angularVelocity = 18.0f / 600.0f;
-        Vector2 delta_mouse_move_uv     = {(new_mouse_pos_x - last_mouse_pos_x), (new_mouse_pos_y - last_mouse_pos_y)};
+        float angularVelocity =
+            18.0f / Math::max(m_engine_window_size.x, m_engine_window_size.y); // 18 degrees while moving full screen
+        Vector2 delta_mouse_move_uv = {(new_mouse_pos_x - last_mouse_pos_x), (new_mouse_pos_y - last_mouse_pos_y)};
 
         Vector3    model_scale;
         Quaternion model_rotation;
@@ -1202,5 +1269,127 @@ namespace Pilot
         }
         m_selected_object_matrix = new_model_matrix;
     }
+    void DrawVecControl(const std::string& label, Pilot::Vector3& values, float resetValue, float columnWidth)
+    {
+        ImGui::PushID(label.c_str());
 
+        ImGui::Columns(2);
+        ImGui::SetColumnWidth(0, columnWidth);
+        ImGui::Text("%s", label.c_str());
+        ImGui::NextColumn();
+
+        ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2 {0, 0});
+
+        float  lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
+        ImVec2 buttonSize = {lineHeight + 3.0f, lineHeight};
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4 {0.8f, 0.1f, 0.15f, 1.0f});
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4 {0.9f, 0.2f, 0.2f, 1.0f});
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4 {0.8f, 0.1f, 0.15f, 1.0f});
+        if (ImGui::Button("X", buttonSize))
+            values.x = resetValue;
+        ImGui::PopStyleColor(3);
+
+        ImGui::SameLine();
+        ImGui::DragFloat("##X", &values.x, 0.1f, 0.0f, 0.0f, "%.2f");
+        ImGui::PopItemWidth();
+        ImGui::SameLine();
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4 {0.2f, 0.45f, 0.2f, 1.0f});
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4 {0.3f, 0.55f, 0.3f, 1.0f});
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4 {0.2f, 0.45f, 0.2f, 1.0f});
+        if (ImGui::Button("Y", buttonSize))
+            values.y = resetValue;
+        ImGui::PopStyleColor(3);
+
+        ImGui::SameLine();
+        ImGui::DragFloat("##Y", &values.y, 0.1f, 0.0f, 0.0f, "%.2f");
+        ImGui::PopItemWidth();
+        ImGui::SameLine();
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4 {0.1f, 0.25f, 0.8f, 1.0f});
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4 {0.2f, 0.35f, 0.9f, 1.0f});
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4 {0.1f, 0.25f, 0.8f, 1.0f});
+        if (ImGui::Button("Z", buttonSize))
+            values.z = resetValue;
+        ImGui::PopStyleColor(3);
+
+        ImGui::SameLine();
+        ImGui::DragFloat("##Z", &values.z, 0.1f, 0.0f, 0.0f, "%.2f");
+        ImGui::PopItemWidth();
+
+        ImGui::PopStyleVar();
+
+        ImGui::Columns(1);
+        ImGui::PopID();
+    }
+
+    void DrawVecControl(const std::string& label, Pilot::Quaternion& values, float resetValue, float columnWidth)
+    {
+        ImGui::PushID(label.c_str());
+
+        ImGui::Columns(2);
+        ImGui::SetColumnWidth(0, columnWidth);
+        ImGui::Text("%s", label.c_str());
+        ImGui::NextColumn();
+
+        ImGui::PushMultiItemsWidths(4, ImGui::CalcItemWidth());
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2 {0, 0});
+
+        float  lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
+        ImVec2 buttonSize = {lineHeight + 3.0f, lineHeight};
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4 {0.8f, 0.1f, 0.15f, 1.0f});
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4 {0.9f, 0.2f, 0.2f, 1.0f});
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4 {0.8f, 0.1f, 0.15f, 1.0f});
+        if (ImGui::Button("X", buttonSize))
+            values.x = resetValue;
+        ImGui::PopStyleColor(3);
+
+        ImGui::SameLine();
+        ImGui::DragFloat("##X", &values.x, 0.1f, 0.0f, 0.0f, "%.2f");
+        ImGui::PopItemWidth();
+        ImGui::SameLine();
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4 {0.2f, 0.45f, 0.2f, 1.0f});
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4 {0.3f, 0.55f, 0.3f, 1.0f});
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4 {0.2f, 0.45f, 0.2f, 1.0f});
+        if (ImGui::Button("Y", buttonSize))
+            values.y = resetValue;
+        ImGui::PopStyleColor(3);
+
+        ImGui::SameLine();
+        ImGui::DragFloat("##Y", &values.y, 0.1f, 0.0f, 0.0f, "%.2f");
+        ImGui::PopItemWidth();
+        ImGui::SameLine();
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4 {0.1f, 0.25f, 0.8f, 1.0f});
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4 {0.2f, 0.35f, 0.9f, 1.0f});
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4 {0.1f, 0.25f, 0.8f, 1.0f});
+        if (ImGui::Button("Z", buttonSize))
+            values.z = resetValue;
+        ImGui::PopStyleColor(3);
+
+        ImGui::SameLine();
+        ImGui::DragFloat("##Z", &values.z, 0.1f, 0.0f, 0.0f, "%.2f");
+        ImGui::PopItemWidth();
+        ImGui::SameLine();
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4 {0.5f, 0.25f, 0.5f, 1.0f});
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4 {0.6f, 0.35f, 0.6f, 1.0f});
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4 {0.5f, 0.25f, 0.5f, 1.0f});
+        if (ImGui::Button("W", buttonSize))
+            values.w = resetValue;
+        ImGui::PopStyleColor(3);
+
+        ImGui::SameLine();
+        ImGui::DragFloat("##W", &values.w, 0.1f, 0.0f, 0.0f, "%.2f");
+        ImGui::PopItemWidth();
+
+        ImGui::PopStyleVar();
+
+        ImGui::Columns(1);
+        ImGui::PopID();
+    }
 } // namespace Pilot
