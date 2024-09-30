@@ -1,13 +1,13 @@
 #pragma once
-namespace Pilot
+namespace Piccolo
 {
     namespace Reflection
     {
         class TypeMetaRegister
         {
         public:
-            static void Register();
-            static void Unregister();
+            static void metaRegister();
+            static void metaUnregister();
         };
     } // namespace Reflection
-} // namespace Pilot
+} // namespace Piccolo

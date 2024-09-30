@@ -5,7 +5,7 @@
 
 #include <cassert>
 
-namespace Pilot
+namespace Piccolo
 {
     class Matrix3x3;
     class Vector3;
@@ -40,6 +40,7 @@ namespace Pilot
 
         void fromRotationMatrix(const Matrix3x3& rotation);
         void toRotationMatrix(Matrix3x3 & rotation) const;
+        void toRotationMatrix(Matrix4x4 & rotation) const;
 
         void fromAngleAxis(const Radian& angle, const Vector3& axis);
 
@@ -215,4 +216,4 @@ namespace Pilot
 
         static const float k_epsilon;
     };
-} // namespace Pilot
+} // namespace Piccolo

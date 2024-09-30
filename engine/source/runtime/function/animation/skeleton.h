@@ -4,7 +4,7 @@
 
 #include "runtime/function/animation/node.h"
 
-namespace Pilot
+namespace Piccolo
 {
     class SkeletonData;
     class BlendStateWithClipData;
@@ -23,5 +23,7 @@ namespace Pilot
         void            applyAnimation(const BlendStateWithClipData& blend_state);
         AnimationResult outputAnimationResult();
         void            resetSkeleton();
+        const Bone*     getBones() const;
+        int32_t         getBonesCount() const;
     };
-} // namespace Pilot
+} // namespace Piccolo

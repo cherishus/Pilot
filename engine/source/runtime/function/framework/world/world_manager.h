@@ -1,21 +1,20 @@
 #pragma once
 
-#include "runtime/core/base/public_singleton.h"
 #include "runtime/resource/res_type/common/world.h"
 
 #include <filesystem>
 #include <string>
 
-namespace Pilot
+namespace Piccolo
 {
     class Level;
+    class LevelDebugger;
+    class PhysicsScene;
 
     /// Manage all game worlds, it should be support multiple worlds, including game world and editor world.
     /// Currently, the implement just supports one active world and one active level
-    class WorldManager : public PublicSingleton<WorldManager>
+    class WorldManager
     {
-        friend class PublicSingleton<WorldManager>;
-
     public:
         virtual ~WorldManager();
 
@@ -28,8 +27,7 @@ namespace Pilot
         void                 tick(float delta_time);
         std::weak_ptr<Level> getCurrentActiveLevel() const { return m_current_active_level; }
 
-    protected:
-        WorldManager() = default;
+        std::weak_ptr<PhysicsScene> getCurrentActivePhysicsScene() const;
 
     private:
         bool loadWorld(const std::string& world_url);
@@ -43,5 +41,8 @@ namespace Pilot
         std::unordered_map<std::string, std::shared_ptr<Level>> m_loaded_levels;
         // active level, currently we just support one active level
         std::weak_ptr<Level> m_current_active_level;
+
+        //debug level
+        std::shared_ptr<LevelDebugger> m_level_debugger;
     };
-} // namespace Pilot
+} // namespace Piccolo

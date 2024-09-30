@@ -8,18 +8,20 @@
 #include "runtime/engine.h"
 #include "runtime/function/character/character.h"
 #include "runtime/function/framework/object/object.h"
-#include "runtime/function/scene/scene_manager.h"
-
+#include "runtime/function/particle/particle_manager.h"
+#include "runtime/function/physics/physics_manager.h"
+#include "runtime/function/physics/physics_scene.h"
 #include <limits>
 
-namespace Pilot
+namespace Piccolo
 {
-    Level::~Level() { clear(); }
-
     void Level::clear()
     {
         m_current_active_character.reset();
         m_gobjects.clear();
+
+        ASSERT(g_runtime_global_context.m_physics_manager);
+        g_runtime_global_context.m_physics_manager->deletePhysicsScene(m_physics_scene);
     }
 
     GObjectID Level::createObject(const ObjectInstanceRes& object_instance_res)
@@ -27,24 +29,25 @@ namespace Pilot
         GObjectID object_id = ObjectIDAllocator::alloc();
         ASSERT(object_id != k_invalid_gobject_id);
 
-        std::shared_ptr<GObject> gobject = std::make_shared<GObject>(object_id);
-
-        if (gobject == nullptr)
+        std::shared_ptr<GObject> gobject;
+        try
+        {
+            gobject = std::make_shared<GObject>(object_id);
+        }
+        catch (const std::bad_alloc&)
         {
             LOG_FATAL("cannot allocate memory for new gobject");
         }
+
+        bool is_loaded = gobject->load(object_instance_res);
+        if (is_loaded)
+        {
+            m_gobjects.emplace(object_id, gobject);
+        }
         else
         {
-            bool is_loaded = gobject->load(object_instance_res);
-            if (is_loaded)
-            {
-                m_gobjects.emplace(object_id, gobject);
-            }
-            else
-            {
-                LOG_ERROR("loading object " + object_instance_res.m_name + " failed");
-                return k_invalid_gobject_id;
-            }
+            LOG_ERROR("loading object " + object_instance_res.m_name + " failed");
+            return k_invalid_gobject_id;
         }
         return object_id;
     }
@@ -56,11 +59,15 @@ namespace Pilot
         m_level_res_url = level_res_url;
 
         LevelRes   level_res;
-        const bool is_load_success = AssetManager::getInstance().loadAsset(level_res_url, level_res);
+        const bool is_load_success = g_runtime_global_context.m_asset_manager->loadAsset(level_res_url, level_res);
         if (is_load_success == false)
         {
             return false;
         }
+
+        ASSERT(g_runtime_global_context.m_physics_manager);
+        m_physics_scene = g_runtime_global_context.m_physics_manager->createPhysicsScene(level_res.m_gravity);
+        ParticleEmitterIDAllocator::reset();
 
         for (const ObjectInstanceRes& object_instance_res : level_res.m_objects)
         {
@@ -113,7 +120,8 @@ namespace Pilot
             }
         }
 
-        const bool is_save_success = AssetManager::getInstance().saveAsset(output_level_res, m_level_res_url);
+        const bool is_save_success =
+            g_runtime_global_context.m_asset_manager->saveAsset(output_level_res, m_level_res_url);
 
         if (is_save_success == false)
         {
@@ -144,9 +152,14 @@ namespace Pilot
         }
         if (m_current_active_character && g_is_editor_mode == false)
         {
-            m_current_active_character->tick();
+            m_current_active_character->tick(delta_time);
         }
-        SceneManager::getInstance().syncSceneObjects();
+
+        std::shared_ptr<PhysicsScene> physics_scene = m_physics_scene.lock();
+        if (physics_scene)
+        {
+            physics_scene->tick(delta_time);
+        }
     }
 
     std::weak_ptr<GObject> Level::getGObjectByID(GObjectID go_id) const
@@ -178,4 +191,4 @@ namespace Pilot
         m_gobjects.erase(go_id);
     }
 
-} // namespace Pilot
+} // namespace Piccolo
